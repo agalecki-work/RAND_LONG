@@ -10,7 +10,7 @@ data _null_;
       put rc=;
 run;
 
-%let repo_name = RAND2LONG;
+%let repo_name = RAND_LONG;
 %let repo_path = C:\Users\agalecki\Documents\GitHub\&repo_name;  
 
 
