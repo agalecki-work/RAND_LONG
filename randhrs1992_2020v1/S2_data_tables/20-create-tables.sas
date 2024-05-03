@@ -1,0 +1,157 @@
+
+options nocenter mprint nodate;
+
+/* Auxiliary user defined macros are loaded */
+filename  umacros "20-umacros.sas";     
+%include  umacros;  /* `rwide_summary_vars` macro */
+
+filename _macros "&repo_path\20-macros";
+%include _macros(zzz_20include);
+filename _macros clear;
+
+
+%macro _20create_table(table, key_vars);
+%put ====> Macro `_20create_table` STARTS here;
+ 
+ filename map_file "&prj_path\&dir_name\map_files\&table._map_file.inc";
+ %include map_file;
+ filename map_file clear; 
+
+ %let tbl_name= &table._table;
+ %let outdata = _data.&tbl_name;
+ %let outdata_formats =_data._RANDfmts_long;
+ 
+  
+ /* copy formats_cntlin from libin to libout */
+  
+  %copy_formats_cntlin;
+
+ /* Create `work.formats` catalog from cntlin dataset*/
+ proc format lib = WORK cntlin = &outdata_formats;
+ run;
+  
+ proc datasets lib = work memtype=cat;
+ run;
+ quit;
+
+
+ %put -- catalog work.formats created;
+/*--- Create `_template_longout` SAS dataset template (zero observations) for long data ----*/
+%create_template_longout;
+
+data _base_longout(label = "%upcase(&table)_table created from &wide_datain (datestamp: &sysdate, Version:= &table_version)");
+  set _template_longout;
+run;
+
+%append_outtable(libin.&datain);   /* RAND data -> _base_longout */
+
+proc sort data = _base_longout nodupkey;
+by &key_vars;   
+run;
+
+
+/* Move and rename  `_base_longout` from `work` to `_data` SAS library */
+ %rename_base_longout;
+
+%let dtname = _data.&table._table;
+%put == &dtname;
+%checkdupkey(&dtname, &key_vars, keepall = N);
+
+
+/* Dictionaries */
+
+libname dict "&dir_path/_05aux/&table";
+
+data _dict.&table._dict;
+  set dict.&table._dict;
+ * length memname $32;
+ * memname = "table_"||strip("&table");
+  drop ctype valid_name varin dispatch; 
+run;
+
+/*--- Cleanup */
+proc datasets library=work;
+    delete _outtable _TEMPLATE_LONGOUT;
+run;
+ 
+  
+libname dict clear;
+ %put ====> Macro `_20create_table` ENDS here;
+ 
+%mend _20create_table;
+
+
+/* ==== Execution starts ==== */
+
+%_project_setup;
+
+filename _macros "&dir_path/_macros"; /* Local macros */
+%include _macros(zzz_include);
+filename _macros clear;
+%zzz_include;
+
+%checkdupkey(libin.&datain, hhid pn , keepall = N );
+
+
+
+libname _data "&HRSpkg_path/data_tables";
+proc datasets library= _data kill;
+run;
+quit;
+
+libname _dict "&output_path/dictionaries";
+proc datasets library= _dict kill;
+run;
+quit;
+
+
+
+%_20create_table(RLong, hhid  PN wave_number);
+
+%_20create_table(HLong, hhid  subhh studyyr);
+%_20create_table(Rwide, hhid  PN);
+%_20create_table(Rexit, hhid  PN);
+%_20create_table(RSSI,  hhid  PN RSSI_EPISODE);
+%_20create_table(SLong, hhid  PN studyyr);
+
+/* Manualy modify data labels */
+proc datasets library =_DATA;
+ modify slong_table (label = "Spouse `S[w]` RAND variables (&sysdate)");
+ modify rlong_table (label = "Respondent `R[w]` RAND variables (&sysdate)");
+ modify rexit_table (label = "Exit `RE` RAND variables (&sysdate)");
+ modify rwide_table (label = "Wave-invariant `RA` variables (&sysdate)");
+ modify rssi_table (label  = "Respondent SSI/SSDI episode variables (&sysdate)");
+ modify hlong_table (label = "Household `H[w]` RAND variables (&sysdate)");
+ modify _RANDFMTS_LONG (label = "CNTLIN dataset with info on SAS formats for all tables (&sysdate)");
+quit;
+
+
+proc datasets library =_DICT;
+ modify slong_dict (label = "Dictionary for SLONG_TABLE (&sysdate)");
+ modify rlong_dict (label = "Dictionary for RLONG_TABLE (&sysdate)");
+ modify rexit_dict (label = "Dictionary for REXIT_TABLE (&sysdate)");
+ modify rwide_dict (label = "Dictionary for RWIDE_TABLE (&sysdate)");
+ modify rssi_dict (label  = "Dictionary for RSSI_TABLE (&sysdate)");
+ modify hlong_dict (label = "Dictionary for HLONG_TABLE (&sysdate)");
+quit;
+
+
+/* ===  readme/Contents documents ====*/
+
+
+options nocenter ls =255 formdlim=' ' nodate;
+
+%let xpath = &HRSpkg_path;
+%let extn =txt;
+
+%let project_title = Project: Convert RAND Longitudinal Data (%upcase(&datain)) into a small set of data tables stored in a long format;
+%print_docs;
+
+
+
+
+
+
+
+
+
