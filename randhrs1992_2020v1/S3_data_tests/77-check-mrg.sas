@@ -18,9 +18,18 @@ proc sort data=rs;
 run;
 
 /* one to many */
+proc sort data = lib.hlong_table out =h;
+by h_hhid studyyr;
+run;
+
+proc sort data=rs;
+by h_hhid studyyr;
+run;
+
+
 data rsh;
-  merge lib.hlong_table rs;
-  by hhid subhh studyyr;
+  merge rs h;
+  by h_hhid studyyr;
 run;
 
 
@@ -34,7 +43,7 @@ data out.mrg5_tables;
 run;
 
 
-proc print data=out.mrg5_tables(obs=2500);
+proc print data=out.mrg5_tables(obs=50);
 run;
 
 
