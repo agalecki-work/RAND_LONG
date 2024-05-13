@@ -14,7 +14,7 @@ data rs;
 run;
 
 proc sort data=rs;
-  by hhid subhh studyyr;
+  by h_hhid studyyr;
 run;
 
 /* one to many */
